@@ -31,7 +31,7 @@ const GLOBAL_CSS = `
   input::placeholder { color:var(--muted); }
 `;
 
-const BASE = "http://localhost:5000";
+const BASE = import.meta.env.VITE_API_BASE_URL || "https://backend-tracker-0ovf.onrender.com";
 
 const DEFAULT_CONFIG   = { api: `${BASE}/api/track/activity`, userId: "default-user", machine: "default-machine" };
 const DEFAULT_FORBIDDEN = [];
