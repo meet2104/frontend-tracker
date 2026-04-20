@@ -36,6 +36,14 @@ const BASE = import.meta.env.VITE_API_BASE_URL || "https://backend-tracker-0ovf.
 const DEFAULT_CONFIG   = { api: `${BASE}/api/track/activity`, userId: "default-user", machine: "default-machine" };
 const DEFAULT_FORBIDDEN = [];
 
+const normalizeAppName = (value = "") =>
+  value.toLowerCase().trim().replace(/\.exe$/i, "");
+
+const isBlockedApp = (appName, forbiddenApps) => {
+  const normalizedApp = normalizeAppName(appName);
+  return forbiddenApps.some((entry) => normalizedApp.includes(normalizeAppName(entry)));
+};
+
 const C = {
   bg:"#060810", s1:"#0c0f1a", s2:"#111525", s3:"#171c2e",
   b1:"rgba(255,255,255,0.055)", b2:"rgba(255,255,255,0.10)",
@@ -300,7 +308,7 @@ function ActivityPanel({ forbidden, activityData, loading, fetchError, paginatio
       state:   a.state || "unknown",
       proc:    a.processCount || 0,
       machine: a.machine || "N/A",
-      blocked: (a.state || "unknown") === "blocked" || forbidden.includes((a.activeApp || "Unknown").toLowerCase()),
+      blocked: (a.state || "unknown") === "blocked" || isBlockedApp(a.activeApp || "Unknown", forbidden),
     }))
     .filter(row => {
       const matchFilter = filter === "all" ||
@@ -468,7 +476,7 @@ function ActivityPanel({ forbidden, activityData, loading, fetchError, paginatio
 function OverviewPanel({ config, forbidden, activityData, onDownloadPDF }) {
   const [activeChartType, setActiveChartType] = useState("line");
   const active  = activityData.filter(a => a.state === "active").length;
-  const blocked = activityData.filter(a => a.state === "blocked" || forbidden.includes((a.activeApp||"").toLowerCase())).length;
+  const blocked = activityData.filter(a => a.state === "blocked" || isBlockedApp(a.activeApp || "", forbidden)).length;
   const total   = activityData.length;
   const pct     = total > 0 ? Math.round((active/total)*100) : 0;
 
@@ -577,7 +585,7 @@ function OverviewPanel({ config, forbidden, activityData, onDownloadPDF }) {
           {recentEvents.length === 0 ? (
             <div style={{ color:C.muted, fontFamily:"var(--mono)", fontSize:".72rem", padding:"1rem 0", textAlign:"center" }}>No events yet</div>
           ) : recentEvents.map((row, i) => {
-            const isBlocked = forbidden.includes(row.app.toLowerCase()) || row.state === "blocked";
+            const isBlocked = isBlockedApp(row.app, forbidden) || row.state === "blocked";
             const col = isBlocked ? C.red : row.state === "active" ? C.green : C.amber;
             return (
               <div key={i} style={{ display:"flex", alignItems:"center", gap:12, padding:"8px 0", borderBottom:i<recentEvents.length-1?`1px solid rgba(255,255,255,0.03)`:"none" }}>
@@ -655,12 +663,12 @@ export default function AgentManager() {
     try {
       try {
         const r = await axios.get(`${BASE}/api/control/config`);
-        if (r.data?.success) setConfig(r.data.config);
+        if (r.data?.success) setConfig({ ...DEFAULT_CONFIG, ...r.data.config });
       } catch { }
 
       try {
         const r = await axios.get(`${BASE}/api/control/forbidden`);
-        if (r.data?.success) setForbidden(r.data.apps);
+        if (r.data?.success) setForbidden(Array.isArray(r.data.apps) ? r.data.apps : []);
       } catch { }
 
       try {
@@ -1244,7 +1252,7 @@ export default function AgentManager() {
   ];
 
   const blockedCount = activityData.filter(a =>
-    a.state==="blocked" || forbidden.includes((a.activeApp||"").toLowerCase())
+    a.state==="blocked" || isBlockedApp(a.activeApp || "", forbidden)
   ).length;
 
   const TRACKER_OFFLINE_MS = 20000;
